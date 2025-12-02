@@ -92,8 +92,8 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
         String orgHandle = request.getParameter(FrameworkConstants.OrgDiscoveryInputParameters.ORG_HANDLE);
         String org = request.getParameter(FrameworkConstants.OrgDiscoveryInputParameters.ORG_NAME);
         String loginHint = request.getParameter(FrameworkConstants.OrgDiscoveryInputParameters.LOGIN_HINT);
-        return StringUtils.isEmpty(orgId) || StringUtils.isEmpty(orgHandle)
-                || StringUtils.isEmpty(org) || StringUtils.isEmpty(loginHint);
+        return StringUtils.isNotEmpty(orgId) || StringUtils.isNotEmpty(orgHandle)
+                || StringUtils.isNotEmpty(org) || StringUtils.isNotEmpty(loginHint);
     }
 
     @Override
@@ -102,7 +102,7 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
             throws AuthenticationFailedException, LogoutFailedException {
 
         if (context.isLogoutRequest()) {
-            super.process(request, response, context);
+            return super.process(request, response, context);
         }
         if (getParameter(request, context, FrameworkConstants.OrgDiscoveryInputParameters.ORG_ID).isPresent()
                 || getParameter(request, context, FrameworkConstants.OrgDiscoveryInputParameters.ORG_HANDLE).isPresent()
@@ -122,10 +122,8 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
                 context.setOrganizationLoginData(organizationLoginData);
                 return AuthenticatorFlowStatus.SUCCESS_COMPLETED;
             }
-        } else {
-            super.process(request, response, context);
         }
-        return AuthenticatorFlowStatus.INCOMPLETE;
+        return super.process(request, response, context);
     }
 
     @Override
@@ -133,6 +131,7 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
                                                  AuthenticationContext context)
             throws AuthenticationFailedException {
 
+        redirectToOrgDiscoveryInputCapture(response, context);
     }
 
     @Override
@@ -140,7 +139,18 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
                                                  AuthenticationContext context)
             throws AuthenticationFailedException {
 
-        handleOrganizationDiscovery(request, response, context);
+        OrganizationDiscoveryResult orgDiscoveryResult = handleOrganizationDiscovery(request, response, context);
+        if (orgDiscoveryResult.isSuccessful()) {
+            OrganizationLoginData organizationLoginData = new OrganizationLoginData();
+            OrganizationData discoveredOrganization = new OrganizationData();
+            discoveredOrganization.setId(orgDiscoveryResult.getDiscoveredOrganization().getId());
+            discoveredOrganization.setName(orgDiscoveryResult.getDiscoveredOrganization().getName());
+            discoveredOrganization.setOrganizationHandle(
+                    orgDiscoveryResult.getDiscoveredOrganization().getOrganizationHandle());
+            organizationLoginData.setAccessingOrganization(discoveredOrganization);
+            organizationLoginData.setSharedApplicationId(orgDiscoveryResult.getSharedApplicationId());
+            context.setOrganizationLoginData(organizationLoginData);
+        }
     }
 
     private OrganizationDiscoveryResult handleOrganizationDiscovery(HttpServletRequest request,
