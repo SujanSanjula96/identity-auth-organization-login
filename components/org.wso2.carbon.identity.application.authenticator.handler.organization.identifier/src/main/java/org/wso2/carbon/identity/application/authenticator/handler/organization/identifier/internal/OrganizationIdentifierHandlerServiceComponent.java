@@ -30,6 +30,8 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.identity.application.authentication.framework.ApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.handler.orgdiscovery.OrganizationDiscoveryHandler;
 import org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.OrganizationIdentifierHandler;
+import org.wso2.carbon.identity.organization.config.service.OrganizationConfigManager;
+import org.wso2.carbon.identity.organization.discovery.service.OrganizationDiscoveryManager;
 
 /**
  * This class acts as a service component for the Organization Identifier Handler.
@@ -84,5 +86,35 @@ public class OrganizationIdentifierHandlerServiceComponent {
 
         OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationDiscoveryHandler(null);
         log.debug("Organization discovery handler is unset in organization identifier handler component.");
+    }
+
+    @Reference(name = "identity.organization.config.management.component",
+            service = OrganizationConfigManager.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetOrganizationConfigManager")
+    protected void setOrganizationConfigManager(OrganizationConfigManager organizationConfigManager) {
+
+        OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationConfigManager(organizationConfigManager);
+    }
+
+    protected void unsetOrganizationConfigManager(OrganizationConfigManager organizationConfigManager) {
+
+        OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationConfigManager(null);
+    }
+
+    @Reference(name = "identity.organization.discovery.management.component",
+            service = OrganizationDiscoveryManager.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetOrganizationDiscoveryManager")
+    protected void setOrganizationDiscoveryManager(OrganizationDiscoveryManager organizationDiscoveryManager) {
+
+        OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationDiscoveryManager(organizationDiscoveryManager);
+    }
+
+    protected void unsetOrganizationDiscoveryManager(OrganizationDiscoveryManager organizationDiscoveryManager) {
+
+        OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationDiscoveryManager(null);
     }
 }

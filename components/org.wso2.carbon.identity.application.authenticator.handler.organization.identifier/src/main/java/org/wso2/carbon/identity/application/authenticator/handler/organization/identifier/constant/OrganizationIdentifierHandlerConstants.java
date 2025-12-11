@@ -38,5 +38,22 @@ public class OrganizationIdentifierHandlerConstants {
     public static final String AUTHENTICATOR_PARAMETER = "authenticator";
 
     public static final String REQUEST_ORG_PAGE_URL = "authenticationendpoint/org_name.do";
+    public static final String REQUEST_ORG_HANDLE_PAGE_URL = "authenticationendpoint/org_handle.do";
+    public static final String REQUEST_ORG_DISCOVERY_PAGE_URL = "authenticationendpoint/org_discovery.do";
     public static final String REQUEST_ORG_PAGE_URL_CONFIG = "RequestOrganizationPage";
+
+    public static final String ORGANIZATION_DISCOVERY_TYPE = "discoveryType";
+    public static final String ORGANIZATION_NAME = "orgName";
+    public static final String ORGANIZATION_HANDLE = "orgHandle";
+    public static final String ORG_ID_PARAMETER = "orgId";
+    public static final String ORG_HANDLE_PARAMETER = "orgHandle";
+    public static final String ORG_DISCOVERY_PARAMETER = "orgDiscovery";
+    public static final String ORG_PARAMETER = "org";
+    public static final String PROMPT_PARAMETER = "prompt";
+
+    public enum DiscoveryPromptOptions {
+        ORG_NAME,
+        ORG_HANDLE,
+        ORG_DISCOVERY
+    }
 }

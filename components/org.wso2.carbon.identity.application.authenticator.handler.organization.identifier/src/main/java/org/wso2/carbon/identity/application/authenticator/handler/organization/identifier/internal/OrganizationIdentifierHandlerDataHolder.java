@@ -19,6 +19,8 @@
 package org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.internal;
 
 import org.wso2.carbon.identity.application.authentication.framework.handler.orgdiscovery.OrganizationDiscoveryHandler;
+import org.wso2.carbon.identity.organization.config.service.OrganizationConfigManager;
+import org.wso2.carbon.identity.organization.discovery.service.OrganizationDiscoveryManager;
 
 /**
  * Data holder for Organization Identifier Handler.
@@ -29,6 +31,8 @@ public class OrganizationIdentifierHandlerDataHolder {
             new OrganizationIdentifierHandlerDataHolder();
 
     private OrganizationDiscoveryHandler organizationDiscoveryHandler;
+    private OrganizationConfigManager organizationConfigManager;
+    private OrganizationDiscoveryManager organizationDiscoveryManager;
 
     private OrganizationIdentifierHandlerDataHolder() {
 
@@ -62,5 +66,25 @@ public class OrganizationIdentifierHandlerDataHolder {
     public void setOrganizationDiscoveryHandler(OrganizationDiscoveryHandler organizationDiscoveryHandler) {
 
         this.organizationDiscoveryHandler = organizationDiscoveryHandler;
+    }
+
+    public OrganizationConfigManager getOrganizationConfigManager() {
+
+        return organizationConfigManager;
+    }
+
+    public void setOrganizationConfigManager(OrganizationConfigManager organizationConfigManager) {
+
+        this.organizationConfigManager = organizationConfigManager;
+    }
+
+    public OrganizationDiscoveryManager getOrganizationDiscoveryManager() {
+
+        return organizationDiscoveryManager;
+    }
+
+    public void setOrganizationDiscoveryManager(OrganizationDiscoveryManager organizationDiscoveryManager) {
+
+        this.organizationDiscoveryManager = organizationDiscoveryManager;
     }
 }
