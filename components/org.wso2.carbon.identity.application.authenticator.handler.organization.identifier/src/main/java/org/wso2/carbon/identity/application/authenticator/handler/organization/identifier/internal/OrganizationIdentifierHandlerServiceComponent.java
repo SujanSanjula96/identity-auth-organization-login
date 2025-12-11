@@ -66,7 +66,7 @@ public class OrganizationIdentifierHandlerServiceComponent {
     @Reference(
             name = "organization.discoverer.handler",
             service = OrganizationDiscoveryHandler.class,
-            cardinality = ReferenceCardinality.OPTIONAL,
+            cardinality = ReferenceCardinality.MANDATORY,
             policy = ReferencePolicy.DYNAMIC,
             unbind = "unsetOrganizationDiscovererHandler"
     )
