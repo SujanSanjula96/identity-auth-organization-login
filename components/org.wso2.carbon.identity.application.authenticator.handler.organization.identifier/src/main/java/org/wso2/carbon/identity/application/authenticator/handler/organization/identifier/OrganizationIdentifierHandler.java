@@ -59,21 +59,17 @@ import javax.servlet.http.HttpServletResponse;
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.SESSION_DATA_KEY;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.AMPERSAND_SIGN;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.AUTHENTICATOR_PARAMETER;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions.ORG_DISCOVERY;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions.ORG_HANDLE;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions.ORG_NAME;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.EQUAL_SIGN;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORGANIZATION_DISCOVERY_TYPE;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORGANIZATION_NAME;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORG_DISCOVERY_PARAMETER;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORG_HANDLE_PARAMETER;
-import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORG_PARAMETER;
+import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.ORG_NAME_PARAMETER;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.PROMPT_PARAMETER;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.REQUEST_ORG_DISCOVERY_PAGE_URL;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.REQUEST_ORG_HANDLE_PAGE_URL;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.REQUEST_ORG_PAGE_URL;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.REQUEST_ORG_PAGE_URL_CONFIG;
 import static org.wso2.carbon.identity.application.authenticator.handler.organization.identifier.constant.OrganizationIdentifierHandlerConstants.SP_ID_PARAMETER;
+import static org.wso2.carbon.identity.organization.config.service.constant.OrganizationConfigConstants.DEFAULT_PARAM;
 import static org.wso2.carbon.identity.organization.config.service.constant.OrganizationConfigConstants.ErrorMessages.ERROR_CODE_DISCOVERY_CONFIG_NOT_EXIST;
 import static org.wso2.carbon.identity.organization.discovery.service.constant.DiscoveryConstants.ENABLE_CONFIG;
 
@@ -84,7 +80,6 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
         AuthenticationFlowHandler {
 
     private static final Log log = LogFactory.getLog(OrganizationIdentifierHandler.class);
-    private String discoveryDefaultParam = ORG_HANDLE_PARAMETER;
 
     @Override
     public String getName() {
@@ -142,12 +137,7 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
                                                  AuthenticationContext context)
             throws AuthenticationFailedException {
 
-        try {
-            discoveryDefaultParam = OrganizationConfigManagerUtil.resolveDefaultDiscoveryParam();
-        } catch (OrganizationConfigException e) {
-            throw new AuthenticationFailedException("Error while resolving the default discovery parameter.");
-        }
-        redirectToOrgDiscoveryInputCapture(response, context);
+        redirectToOrgDiscoveryInputCapture(request, response, context);
     }
 
     @Override
@@ -192,7 +182,8 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
                 return true;
             }
         } catch (FrameworkException e) {
-            throw new AuthenticationFailedException("Error while discovering organization.", e);
+            throw new AuthenticationFailedException(
+                    "Organization discovery failed. Cannot proceed with authentication.");
         }
         return false;
     }
@@ -210,60 +201,97 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
         return organizationLoginData;
     }
 
-    /**
-     * Returns parameter value from the request or runtime parameters.
-     *
-     * @param request              HTTP servlet request.
-     * @param context              Authentication context.
-     * @param parameterKey         Key of the parameter to retrieve.
-     * @param includeRuntimeParams Whether to include runtime parameters in adaptive script.
-     * @return Optional containing the parameter value if present, otherwise empty.
-     */
-    private Optional<String> getParameter(HttpServletRequest request, AuthenticationContext context,
-                                          String parameterKey, boolean includeRuntimeParams) {
-
-        if (request.getParameterMap().containsKey(parameterKey)) {
-            return Optional.of(request.getParameter(parameterKey));
-        }
-        Map<String, String> runtimeParams = getRuntimeParams(context);
-        if (includeRuntimeParams && runtimeParams.containsKey(parameterKey)) {
-            return Optional.of(runtimeParams.get(parameterKey));
-        }
-        return Optional.empty();
-    }
-
-    private void redirectToOrgDiscoveryInputCapture(HttpServletResponse response, AuthenticationContext context)
+    private void redirectToOrgDiscoveryInputCapture(HttpServletRequest request, HttpServletResponse response, AuthenticationContext context)
             throws AuthenticationFailedException {
 
         try {
+            String discoveryDefaultParam = OrganizationConfigManagerUtil.resolveDefaultDiscoveryParam();
+
             StringBuilder queryStringBuilder = new StringBuilder();
             queryStringBuilder.append(SESSION_DATA_KEY).append(EQUAL_SIGN)
                     .append(urlEncode(context.getContextIdentifier()));
-            ;
             addQueryParam(queryStringBuilder, AUTHENTICATOR_PARAMETER, getName());
             addQueryParam(queryStringBuilder, SP_ID_PARAMETER, context.getServiceProviderResourceId());
+            addQueryParam(queryStringBuilder, DEFAULT_PARAM, discoveryDefaultParam);
 
-            boolean discoveryEnabled = isOrganizationDiscoveryEnabled(context);
-            String prompt = (String) context.getProperty(PROMPT_PARAMETER);
-            if (prompt != null) {
-                context.removeProperty(PROMPT_PARAMETER);
-            }
-            response.sendRedirect(resolveRedirectURL(context, queryStringBuilder, prompt, discoveryEnabled));
+            String baseUrl = resolveBaseRedirectUrl(request, context, discoveryDefaultParam);
+            String redirectUrl = FrameworkUtils.appendQueryParamsStringToUrl(baseUrl, queryStringBuilder.toString());
+            response.sendRedirect(redirectUrl);
         } catch (IOException | URLBuilderException e) {
             throw new AuthenticationFailedException(
-                    "Error while redirecting to organization discovery input capture page.", e);
+                    "Error while redirecting to organization discovery input capture page.");
+        } catch (OrganizationConfigException e) {
+            throw new AuthenticationFailedException("Error while resolving the default discovery parameter.");
         }
     }
 
-    private void addQueryParam(StringBuilder builder, String query, String param) throws
-            UnsupportedEncodingException {
+    private String resolveBaseRedirectUrl(HttpServletRequest request, AuthenticationContext context,
+                                          String discoveryDefaultParam)
+            throws URLBuilderException, AuthenticationFailedException {
 
-        builder.append(AMPERSAND_SIGN).append(query).append(EQUAL_SIGN).append(urlEncode(param));
+        String promptParameter = request.getParameter(PROMPT_PARAMETER);
+        boolean discoveryEnabled = isOrganizationDiscoveryEnabled(context);
+
+        // Handling the discovery mode switching based on the prompt parameter.
+        if (StringUtils.isNotEmpty(promptParameter)) {
+            switch (promptParameter) {
+                case OrganizationIdentifierHandlerConstants.ORGANIZATION_NAME_PROMPT_PARAMETER:
+                    return getOrganizationRequestPageUrl(context);
+                case OrganizationIdentifierHandlerConstants.ORG_HANDLE_PARAMETER:
+                    return getOrganizationHandleRequestPageUrl();
+                case OrganizationIdentifierHandlerConstants.ORG_DISCOVERY_PARAMETER:
+                    if (discoveryEnabled) {
+                        return getOrganizationDomainPageUrl();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Handling the retry scenarios based on the request parameters.
+        if (request.getParameter(ORG_NAME_PARAMETER) != null) {
+            return getOrganizationRequestPageUrl(context);
+        }
+        if (request.getParameter(ORG_HANDLE_PARAMETER) != null) {
+            return getOrganizationHandleRequestPageUrl();
+        }
+        if (request.getParameter(ORG_DISCOVERY_PARAMETER) != null && discoveryEnabled) {
+            return getOrganizationDomainPageUrl();
+        }
+
+        // Handling the initial redirection to organization discovery input capture page.
+        if (discoveryEnabled) {
+            return getOrganizationDomainPageUrl();
+        }
+        if (ORG_HANDLE_PARAMETER.equals(discoveryDefaultParam)) {
+            return getOrganizationHandleRequestPageUrl();
+        }
+        return getOrganizationRequestPageUrl(context);
     }
 
-    private String urlEncode(String value) throws UnsupportedEncodingException {
+    private boolean isOrganizationDiscoveryEnabled(AuthenticationContext context) throws AuthenticationFailedException {
 
-        return URLEncoder.encode(value, FrameworkUtils.UTF_8);
+        try {
+            DiscoveryConfig discoveryConfig = OrganizationIdentifierHandlerDataHolder.getInstance()
+                    .getOrganizationConfigManager().getDiscoveryConfiguration();
+            List<ConfigProperty> configProperties = discoveryConfig.getConfigProperties();
+            for (ConfigProperty configProperty : configProperties) {
+                String type = configProperty.getKey().split(ENABLE_CONFIG)[0];
+                Map<String, AttributeBasedOrganizationDiscoveryHandler> discoveryHandlers =
+                        OrganizationIdentifierHandlerDataHolder.getInstance().getOrganizationDiscoveryManager()
+                                .getAttributeBasedOrganizationDiscoveryHandlers();
+                if (discoveryHandlers.get(type) != null && Boolean.parseBoolean(configProperty.getValue())) {
+                    return true;
+                }
+            }
+        } catch (OrganizationConfigException e) {
+            if (ERROR_CODE_DISCOVERY_CONFIG_NOT_EXIST.getCode().equals(e.getErrorCode())) {
+                return false;
+            }
+            throw new AuthenticationFailedException("Error while checking organization discovery configuration.");
+        }
+        return false;
     }
 
     private String getOrganizationRequestPageUrl(AuthenticationContext context) throws URLBuilderException {
@@ -296,99 +324,39 @@ public class OrganizationIdentifierHandler extends AbstractApplicationAuthentica
         } else if ((context.getProperty(configName)) != null) {
             configValue = String.valueOf(context.getProperty(configName));
         }
-        if (log.isDebugEnabled()) {
-            log.debug("Config value for key " + configName + " for tenant " + tenantDomain + " : " + configValue);
-        }
         return configValue;
     }
 
-    private String resolveRedirectURL(AuthenticationContext context, StringBuilder queryStringBuilder,
-                                      String prompt, boolean discoveryEnabled) throws URLBuilderException {
+    /**
+     * Returns parameter value from the request or runtime parameters.
+     *
+     * @param request              HTTP servlet request.
+     * @param context              Authentication context.
+     * @param parameterKey         Key of the parameter to retrieve.
+     * @param includeRuntimeParams Whether to include runtime parameters in adaptive script.
+     * @return Optional containing the parameter value if present, otherwise empty.
+     */
+    private Optional<String> getParameter(HttpServletRequest request, AuthenticationContext context,
+                                          String parameterKey, boolean includeRuntimeParams) {
 
-        OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions discoveryPromptOption = determineDiscoveryPromptOption(
-                context, prompt, discoveryEnabled);
-        String baseUrl = getRoutingBaseUrl(discoveryPromptOption, context);
-
-        return FrameworkUtils.appendQueryParamsStringToUrl(baseUrl, queryStringBuilder.toString());
+        if (request.getParameterMap().containsKey(parameterKey)) {
+            return Optional.of(request.getParameter(parameterKey));
+        }
+        Map<String, String> runtimeParams = getRuntimeParams(context);
+        if (includeRuntimeParams && runtimeParams.containsKey(parameterKey)) {
+            return Optional.of(runtimeParams.get(parameterKey));
+        }
+        return Optional.empty();
     }
 
-    private String getRoutingBaseUrl(OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions routingType,
-                                     AuthenticationContext context) throws URLBuilderException {
+    private void addQueryParam(StringBuilder builder, String query, String param) throws
+            UnsupportedEncodingException {
 
-        switch (routingType) {
-            case ORG_NAME:
-                return getOrganizationRequestPageUrl(context);
-            case ORG_HANDLE:
-                return getOrganizationHandleRequestPageUrl();
-            case ORG_DISCOVERY:
-            default:
-                return getOrganizationDomainPageUrl();
-        }
+        builder.append(AMPERSAND_SIGN).append(query).append(EQUAL_SIGN).append(urlEncode(param));
     }
 
-    private OrganizationIdentifierHandlerConstants.DiscoveryPromptOptions determineDiscoveryPromptOption(
-            AuthenticationContext context, String prompt, boolean discoveryEnabled) {
+    private String urlEncode(String value) throws UnsupportedEncodingException {
 
-        // If prompt is explicitly provided.
-        if (StringUtils.isNotEmpty(prompt)) {
-            switch (prompt) {
-                case ORGANIZATION_NAME:
-                    return ORG_NAME;
-                case ORG_HANDLE_PARAMETER:
-                    return ORG_HANDLE;
-                case ORG_DISCOVERY_PARAMETER:
-                    if (discoveryEnabled) {
-                        return ORG_DISCOVERY;
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-        // If no prompt, check context for the property to handle invalid input scenarios.
-        if (context.getProperty(ORG_PARAMETER) != null) {
-            return ORG_NAME;
-        }
-        if (context.getProperty(ORG_HANDLE_PARAMETER) != null) {
-            return ORG_HANDLE;
-        }
-        if (context.getProperty(ORG_DISCOVERY_PARAMETER) != null && discoveryEnabled) {
-            return ORG_DISCOVERY;
-        }
-
-        // Else fallback to the default options.
-        if (discoveryEnabled) {
-            return ORG_DISCOVERY;
-        }
-        if (ORG_HANDLE_PARAMETER.equals(discoveryDefaultParam)) {
-            return ORG_HANDLE;
-        }
-        return ORG_NAME;
-    }
-
-    private boolean isOrganizationDiscoveryEnabled(AuthenticationContext context) throws AuthenticationFailedException {
-
-        try {
-            DiscoveryConfig discoveryConfig = OrganizationIdentifierHandlerDataHolder.getInstance()
-                    .getOrganizationConfigManager().getDiscoveryConfiguration();
-            List<ConfigProperty> configProperties = discoveryConfig.getConfigProperties();
-            for (ConfigProperty configProperty : configProperties) {
-                String type = configProperty.getKey().split(ENABLE_CONFIG)[0];
-                Map<String, AttributeBasedOrganizationDiscoveryHandler> discoveryHandlers =
-                        OrganizationIdentifierHandlerDataHolder.getInstance().getOrganizationDiscoveryManager()
-                                .getAttributeBasedOrganizationDiscoveryHandlers();
-                if (discoveryHandlers.get(type) != null && Boolean.parseBoolean(configProperty.getValue())) {
-                    context.setProperty(ORGANIZATION_DISCOVERY_TYPE, type);
-                    return true;
-                }
-            }
-        } catch (OrganizationConfigException e) {
-            if (ERROR_CODE_DISCOVERY_CONFIG_NOT_EXIST.getCode().equals(e.getErrorCode())) {
-                return false;
-            }
-            throw new AuthenticationFailedException("Error while checking organization discovery " +
-                    "configuration.", e);
-        }
-        return false;
+        return URLEncoder.encode(value, FrameworkUtils.UTF_8);
     }
 }

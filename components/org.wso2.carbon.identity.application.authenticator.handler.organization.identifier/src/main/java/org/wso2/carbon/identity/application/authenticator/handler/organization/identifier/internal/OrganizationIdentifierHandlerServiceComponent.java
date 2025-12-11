@@ -110,7 +110,8 @@ public class OrganizationIdentifierHandlerServiceComponent {
             unbind = "unsetOrganizationDiscoveryManager")
     protected void setOrganizationDiscoveryManager(OrganizationDiscoveryManager organizationDiscoveryManager) {
 
-        OrganizationIdentifierHandlerDataHolder.getInstance().setOrganizationDiscoveryManager(organizationDiscoveryManager);
+        OrganizationIdentifierHandlerDataHolder.getInstance()
+                .setOrganizationDiscoveryManager(organizationDiscoveryManager);
     }
 
     protected void unsetOrganizationDiscoveryManager(OrganizationDiscoveryManager organizationDiscoveryManager) {
